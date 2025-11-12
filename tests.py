@@ -22,3 +22,18 @@ class ClientTest(unittest.TestCase):
             server = server_type(products)
             client = Client(server)
             self.assertEqual(5, client.get_total_price(2))
+
+class ProductTest(unittest.TestCase):
+    def test_improper_name(self):
+        improper_names = ['', 'a3b', 'a b33', 'ab3 3','3ab','3','a']
+
+        for name in improper_names:
+            with self.subTest(name=name):
+                with self.assertRaises(ValueError):
+                    Product(name,3.0)
+    
+    def test_is_equal(self):
+        a = Product('a3',3)
+        b = Product('a3',3)
+        self.assertNotEqual(id(a),id(b))
+        self.assertEqual(a,b)

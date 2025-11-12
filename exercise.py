@@ -3,9 +3,8 @@ from abc import ABC, abstractmethod
 import re
  
 class Product:
-    # FIXME: klasa powinna posiadać metodę inicjalizacyjną przyjmującą argumenty wyrażające nazwę produktu (typu str) i jego cenę (typu float) -- w takiej kolejności -- i ustawiającą atrybuty `name` (typu str) oraz `price` (typu float)
     def __init__(self, name: str, price: float):
-        if not re.fullmatch("^[a-zA-Z]+\d+$",name): raise ValueError('Niepoprawna nazwa') #sprawdz czy dobry pattern
+        if not re.fullmatch("^[a-zA-Z]+\d+$",name): raise ValueError('Niepoprawna nazwa') 
         self.name = name
         self.price = price
     def __eq__(self, other):
@@ -14,8 +13,10 @@ class Product:
     def __hash__(self):
         return hash((self.name, self.price))
  
+class ServerError(Exception):
+    pass
  
-class TooManyProductsFoundError:
+class TooManyProductsFoundError(ServerError):
     # Reprezentuje wyjątek związany ze znalezieniem zbyt dużej liczby produktów.
     pass
  
@@ -26,18 +27,18 @@ class Server(ABC):
     def internal_get_entries(self, n_letters: int = 1) -> List[Product]:
         raise NotImplementedError
     
-    def get_entries(self, n_letter: int = 1) -> List[Product] | TooManyProductsFoundError:
-        products = self.internal_get_entries(n_letter)
+    def get_entries(self, n_letters: int = 1) -> List[Product] | TooManyProductsFoundError:
+        products = self.internal_get_entries(n_letters)
         #checked_products = [product.name for product in products if re.fullmatch("^[a-zA-Z]{n_letter}\d{2,3}$", product.name)]
         checked_products = []
         counter = 0
         for product in products:
-            if re.fullmatch("^[a-zA-Z]{n_letter}\d{2,3}$", product.name):
+            if re.fullmatch('^[a-zA-Z]{{{n}}}\\d{{2,3}}$'.format(n=n_letters), product.name):
                 counter += 1
-                checked_products.append(product.name)
+                checked_products.append(product)
             if counter > Server.n_max_returned_entries:
                 raise TooManyProductsFoundError
-        checked_products.sort(key = lambda product: product.price) #czy zadziala na pustej liscie
+        checked_products.sort(key = lambda product: product.price) 
         return checked_products
 
 # FIXME: Każada z poniższych klas serwerów powinna posiadać:
@@ -48,20 +49,30 @@ class Server(ABC):
 
 class ListServer(Server):
     def __init__(self, products: List[Product]):
-        super().__init__() #czy Server.init? czy wgl potrzebne?
+        super().__init__() 
         self.products = products
     
     def internal_get_entries(self, n_letters: int = 1) -> List[Product]:
-        
- 
-class MapServer:
+        return [product for product in self.products if re.fullmatch('^[a-zA-Z]{{{n}}}\\d{{2,3}}$'.format(n=n_letters), product.name)]
+    
+class MapServer(Server):
     def __init__(self, products: List[Product]):
         super().__init__()
         self.products = {product.name : product for product in products}
  
+    def internal_get_entries(self, n_letters: int = 1) -> List[Product]:
+        return [product for product in self.products.values() if re.fullmatch('^[a-zA-Z]{{{n}}}\\d{{2,3}}$'.format(n=n_letters), product.name)]
  
 class Client:
     # FIXME: klasa powinna posiadać metodę inicjalizacyjną przyjmującą obiekt reprezentujący serwer
- 
+    def __init__(self, server: Server):
+        self.server = server
+
     def get_total_price(self, n_letters: Optional[int]) -> Optional[float]:
-        raise NotImplementedError()
+        try:
+            products = self.server.get_entries(n_letters)
+        except(ServerError, TypeError):
+            return None
+        else:
+            if not products: return None
+            return sum(product.price for product in products)
